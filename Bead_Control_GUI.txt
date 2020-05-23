@@ -1,0 +1,1806 @@
+function varargout = Bead_Control_GUI(varargin)
+% BEAD_CONTROL_GUI MATLAB code for Bead_Control_GUI.fig
+%      BEAD_CONTROL_GUI, by itself, creates a new BEAD_CONTROL_GUI or raises the existing
+%      singleton*.
+%
+%      H = BEAD_CONTROL_GUI returns the handle to a new BEAD_CONTROL_GUI or the handle to
+%      the existing singleton*.
+%
+%      BEAD_CONTROL_GUI('CALLBACK',hObject,eventData,handles,...) calls the local
+%      function named CALLBACK in BEAD_CONTROL_GUI.M with the given input arguments.
+%
+%      BEAD_CONTROL_GUI('Property','Value',...) creates a new BEAD_CONTROL_GUI or raises the
+%      existing singleton*.  Starting from the left, property value pairs are
+%      applied to the GUI before Bead_Control_GUI_OpeningFcn gets called.  An
+%      unrecognized property name or invalid value makes property application
+%      stop.  All inputs are passed to Bead_Control_GUI_OpeningFcn via varargin.
+%
+
+
+% Begin initialization code - DO NOT EDIT
+gui_Singleton = 1;
+gui_State = struct('gui_Name',       mfilename, ...
+                   'gui_Singleton',  gui_Singleton, ...
+                   'gui_OpeningFcn', @Bead_Control_GUI_OpeningFcn, ...
+                   'gui_OutputFcn',  @Bead_Control_GUI_OutputFcn, ...
+                   'gui_LayoutFcn',  [] , ...
+                   'gui_Callback',   []);
+if nargin && ischar(varargin{1})
+    gui_State.gui_Callback = str2func(varargin{1});
+end
+
+if nargout
+    [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:});
+else
+    gui_mainfcn(gui_State, varargin{:});
+end
+% End initialization code - DO NOT EDIT
+
+
+% --- Executes just before Bead_Control_GUI is made visible.
+function Bead_Control_GUI_OpeningFcn(hObject, eventdata, handles, varargin)
+% This function has no output args, see OutputFcn.
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+% varargin   command line arguments to Bead_Control_GUI (see VARARGIN)
+
+% Choose default command line output for Bead_Control_GUI
+handles.output = hObject;
+
+
+addpath('C:\dev\SDK\MATLAB_64\MATLAB_64');% path for Mathlab"***.m" file
+addpath('C:\dev\SDK\MATLAB_64\MATLAB_64\DLL64\');% path for DLL library
+addpath('C:\dev\SDK\MATLAB_64\Example\')% path your script
+
+%%Always use Elveflow_Load at the begining, it load the DLL
+Elveflow_Load;
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+%create equivalent of char[] to communicate with DLL
+%the instrument name can be found in NI Max
+Instrument_Name = libpointer('cstring','Dev1'); 
+
+
+%pointer to store the instrument ID (no array)
+Inst_ID=libpointer('int32Ptr',zeros(1,1));
+handles.inst_id = Inst_ID;
+  %Initiate the device 
+if error==0
+      error=MUX_Initialization(Instrument_Name,Inst_ID);
+end
+
+disp(strcat('Instrument ID = ', num2str(Inst_ID.Value)));%show the instrument number
+
+
+%%%%%%%%%%%%%%%%
+
+%init required variables
+
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+% Update handles structure
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+handles.stop_beads = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+handles.stop_media = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+handles.current_channel = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+handles.Filling_flow = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+handles.Removing_Flow = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+handles.Primary_outlet = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+handles.Direct_to_array = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+handles.Media_a = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+handles.Media_b = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+handles.Media_c = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+
+guidata(hObject, handles);
+
+% UIWAIT makes Bead_Control_GUI wait for user response (see UIRESUME)
+% uiwait(handles.figure1);
+
+
+% --- Outputs from this function are returned to the command line.
+function varargout = Bead_Control_GUI_OutputFcn(hObject, eventdata, handles) 
+% varargout  cell array for returning output args (see VARARGOUT);
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Get default command line output from handles structure
+varargout{1} = handles.output;
+
+
+% --- Executes on button press in bead1.
+function bead1_Callback(hObject, eventdata, handles)
+% hObject    handle to bead1 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of bead1
+
+
+
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+Stop_beads = handles.stop_beads;
+stop_media = handles.stop_media;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+
+if (get(hObject,'Value') == get(hObject,'Max'))
+
+    Array_user = A2 + A4 + B3 + B1 + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    handles.current_channel = A2+A4+B3+B1;
+else
+    All_open = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+            Array_user = All_open + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+            Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+                    error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+    handles.current_channel = All_open;
+   end
+
+
+guidata(hObject, handles);
+
+% --- Executes on button press in bead2.
+function bead2_Callback(hObject, eventdata, handles)
+% hObject    handle to bead2 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+Stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+
+    Array_user = A2 + A4 + B3 + B2 + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    handles.current_channel = A2 + A4 + B3 + B2;
+else
+    All_open = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+            Array_user = All_open + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+            Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+                    error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+    handles.current_channel = All_open;
+   end
+
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of bead2
+
+
+% --- Executes on button press in bead3.
+function bead3_Callback(hObject, eventdata, handles)
+% hObject    handle to bead3 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+Stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+
+    Array_user = A2 + A4 + B4 + B1 + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    handles.current_channel = A2 + A4 + B4 + B1;
+else
+    All_open = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+            Array_user = All_open + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+            Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+                    error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+    handles.current_channel = All_open;
+   end
+
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of bead3
+
+
+% --- Executes on button press in bead4.
+function bead4_Callback(hObject, eventdata, handles)
+% hObject    handle to bead4 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+Stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+
+    Array_user = A2 + A4 + B4 + B2 + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    handles.current_channel = A2 + A4 + B4 + B2;
+else
+    All_open = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+            Array_user = All_open + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+            Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+                    error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+    handles.current_channel = All_open;
+   end
+
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of bead4
+
+
+% --- Executes on button press in bead5.
+function bead5_Callback(hObject, eventdata, handles)
+% hObject    handle to bead5 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+Stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+
+    Array_user = A2 + A3 + B3 + B1 + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    handles.current_channel = A2 + A3 + B3 + B1;
+else
+    All_open = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+            Array_user = All_open + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+            Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+                    error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+    handles.current_channel = All_open;
+   end
+
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of bead5
+
+
+% --- Executes on button press in bead6.
+function bead6_Callback(hObject, eventdata, handles)
+% hObject    handle to bead6 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+Stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+
+    Array_user = A2 + A3 + B3 + B2 + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    handles.current_channel = A2 + A3 + B3 + B2;
+else
+    All_open = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+            Array_user = All_open + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+            Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+                    error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+    handles.current_channel = All_open;
+   end
+
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of bead6
+
+
+% --- Executes on button press in bead7.
+function bead7_Callback(hObject, eventdata, handles)
+% hObject    handle to bead7 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+Stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+
+    Array_user = A2 + A3 + B4 + B1 + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactelly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    handles.current_channel = A2 + A3 + B4 + B1;
+else
+    All_open = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+            Array_user = All_open + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+            Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+                    error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+    handles.current_channel = All_open;
+   end
+
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of bead7
+
+
+% --- Executes on button press in bead8.
+function bead8_Callback(hObject, eventdata, handles)
+% hObject    handle to bead8 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+Stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+
+    Array_user = A2 + A3 + B4 + B2 + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    handles.current_channel = A2 + A3 + B4 + B2;
+else
+    All_open = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+            Array_user = All_open + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+            Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+                    error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+    handles.current_channel = All_open;
+   end
+
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of bead8
+
+
+% --- Executes on button press in bead9.
+function bead9_Callback(hObject, eventdata, handles)
+% hObject    handle to bead9 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+Stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+
+    Array_user = A1 + A4 + B3 + B1 + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    handles.current_channel = A1 + A4 + B3 + B1;
+else
+    All_open = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+            Array_user = All_open + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+            Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+                    error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+    handles.current_channel = All_open;
+   end
+
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of bead9
+
+
+% --- Executes on button press in bead10.
+function bead10_Callback(hObject, eventdata, handles)
+% hObject    handle to bead10 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+Stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+
+    Array_user = A1 + A4 + B3 + B2 + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    handles.current_channel = A1 + A4 + B3 + B2;
+else
+    All_open = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+            Array_user = All_open + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+            Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+                    error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+    handles.current_channel = All_open;
+   end
+
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of bead10
+
+
+% --- Executes on button press in bead11.
+function bead11_Callback(hObject, eventdata, handles)
+% hObject    handle to bead11 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+Stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+
+    Array_user = A1 + A4 + B4 + B1 + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    handles.current_channel = A1 + A4 + B4 + B1 ;
+else
+    All_open = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+            Array_user = All_open + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+            Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+                    error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+    handles.current_channel = All_open;
+   end
+
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of bead11
+
+
+% --- Executes on button press in bead12.
+function bead12_Callback(hObject, eventdata, handles)
+% hObject    handle to bead12 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+Stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+
+    Array_user = A1 + A4 + B4 + B2 + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    handles.current_channel = A1 + A4 + B4 + B2;
+else
+    All_open = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+            Array_user = All_open + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+            Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+                    error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+    handles.current_channel = All_open;
+   end
+
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of bead12
+
+
+% --- Executes on button press in bead13.
+function bead13_Callback(hObject, eventdata, handles)
+% hObject    handle to bead13 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+Stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+
+    Array_user = A1 + A3 + B3 + B1 + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    handles.current_channel = A1 + A3 + B3 + B1;
+else
+    All_open = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+            Array_user = All_open + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+            Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+                    error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+    handles.current_channel = All_open;
+   end
+
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of bead13
+
+
+% --- Executes on button press in bead14.
+function bead14_Callback(hObject, eventdata, handles)
+% hObject    handle to bead14 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+Stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+
+    Array_user = A1 + A3 + B3 + B2 + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    handles.current_channel = A1 + A3 + B3 + B2;
+else
+    All_open = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+            Array_user = All_open + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+            Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+                    error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+    handles.current_channel = All_open;
+   end
+
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of bead14
+
+
+% --- Executes on button press in bead15.
+function bead15_Callback(hObject, eventdata, handles)
+% hObject    handle to bead15 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+Stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+
+    Array_user = A1 + A3 + B4 + B1 + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    handles.current_channel = A1 + A3 + B4 + B1;
+else
+    All_open = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+            Array_user = All_open + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+            Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+                    error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+    handles.current_channel = All_open;
+   end
+
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of bead15
+
+
+% --- Executes on button press in bead16.
+function bead16_Callback(hObject, eventdata, handles)
+% hObject    handle to bead16 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+A1 = [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]; 
+B1 = [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+C1 = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+D1 = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+A2 = [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0];
+C2 = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+D2 = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+A3 = [0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0];
+B3 = [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0];
+C3 = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+D3 = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+A4 = [0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0];
+B4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+C4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+D4 = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+Stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+
+    Array_user = A1 + A3 + B4 + B2 + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    handles.current_channel = A1 + A3 + B4 + B2;
+else
+    All_open = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+            Array_user = All_open + Stop_beads + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+            Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+                    error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+    handles.current_channel = All_open;
+   end
+
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of bead16
+
+
+% --- Executes on button press in stop_beads.
+function stop_beads_Callback(hObject, eventdata, handles)
+% hObject    handle to stop_beads (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of stop_beads
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+	stop_beads = [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0];
+    
+     Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    
+else
+	stop_beads = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+    Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+end
+
+handles.stop_beads = stop_beads;
+
+guidata(hObject, handles);
+
+% --- Executes on button press in filling_flow.
+function filling_flow_Callback(hObject, eventdata, handles)
+% hObject    handle to filling_flow (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of filling_flow
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+
+current_channel = handles.current_channel;
+stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+	Filling_flow = [0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0];
+    
+     Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    
+else
+	Filling_flow = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+    Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+end
+
+handles.Filling_flow = Filling_flow;
+
+guidata(hObject, handles);
+
+% --- Executes on button press in removing_flow.
+function removing_flow_Callback(hObject, eventdata, handles)
+% hObject    handle to removing_flow (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+
+current_channel = handles.current_channel;
+stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+	Removing_flow = [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0];
+    
+     Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    
+else
+	Removing_flow = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+    Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+end
+
+handles.Removing_flow = Removing_flow;
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of removing_flow
+
+
+% --- Executes during object creation, after setting all properties.
+function bead1_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to bead1 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+
+
+% --- Executes on button press in exit.
+function exit_Callback(hObject, eventdata, handles)
+% hObject    handle to exit (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+%%%%%%%%%%%%%%%
+%EXIT
+%%%%%%%%%%%%%%%
+%Close communication 
+%Clear all pointer if not done properly, it will crash next time the srcipt
+%runs
+%%%%%%%%%%%%%%%
+
+Inst_ID = handles.inst_id;
+
+MUX_Destructor(Inst_ID.Value);%close communication with the instrument
+
+Elveflow_Unload;
+
+clear Instrument_Name;
+clear Inst_ID;
+clear Array_all_open_Ptr;
+clear Array_user_Ptr;
+clear Array_all_closed_Ptr;
+clear trigger;
+
+guidata(hObject, handles);
+
+% --- Executes during object creation, after setting all properties.
+function exit_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to exit (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+
+% --- Executes on button press in pushbutton22.
+function pushbutton22_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton22 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+Array_user=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];% change here valve state (see MUX_Set_all_valves.m for description)
+Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+Array_all_closed=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];% change here valve state (see MUX_Set_all_valves.m for description)
+Array_all_closed_Ptr = libpointer('int32Ptr',Array_all_closed);%%init all valves here !!! should be exactelly 16 elements, otherwise nothing will happen 
+
+
+
+%while (~strcmp(answer,'exit')) %loop until user enter exit
+    % get user answer 
+  %  answer='non valid answer to avoid looping indefinitelly';
+  %  while (~(strcmp(answer,'set individual valve')||strcmp(answer,'set all valves')||strcmp(answer,'close all')||strcmp(answer,'open all')||strcmp(answer,'get trigger')||strcmp(answer,'set trigger')||strcmp(answer,'exit')))
+ %   prompt = '\nChose what to do: set individual valve, set all valves, close all, open all, get trigger, set trigger op exit\n';
+ %   answer = input(prompt,'s');
+ %   end
+
+    
+   
+    
+    %set all valves (uses Array_user defined above)
+ %   if strcmp(answer,'set all valves')
+        
+  %      if error==0
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);
+   %     end
+ %   end
+    
+      %Close all valves 
+  %  if strcmp(answer,'close all')
+        
+   %     if error==0
+    %        error = MUX_Set_all_valves(Inst_ID.Value, Array_all_closed_Ptr,16);
+     %   end
+  %  end
+    
+       
+    
+   
+    
+    
+   
+    
+     
+%end
+
+%%%%%%%%%%%%%%%
+%EXIT
+%%%%%%%%%%%%%%%
+%Close communication 
+%Clear all pointer if not done properly, it will crash next time the srcipt
+%runs
+%%%%%%%%%%%%%%%
+
+
+%MUX_Destructor(Inst_ID.Value);%close communication with the instrument
+
+%Elveflow_Unload;
+
+%clear Instrument_Name;
+%clear Inst_ID;
+%clear Array_all_open_Ptr;
+%clear Array_user_Ptr;
+%clear Array_all_closed_Ptr;
+%clear trigger;
+
+guidata(hObject, handles);
+
+
+% --- Executes on button press in direct_to_array.
+function direct_to_array_Callback(hObject, eventdata, handles)
+% hObject    handle to direct_to_array (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+
+current_channel = handles.current_channel;
+stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+	Direct_to_array  = [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0];
+    
+     Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    
+else
+	Direct_to_array  = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+    Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+end
+
+handles.Direct_to_array  = Direct_to_array ;
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of direct_to_array
+
+
+% --- Executes on button press in media_a.
+function media_a_Callback(hObject, eventdata, handles)
+% hObject    handle to media_a (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+
+current_channel = handles.current_channel;
+stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+	Media_a  = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1];
+    
+     Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    
+else
+	Media_a  = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+    Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+end
+
+handles.Media_a  = Media_a ;
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of media_a
+
+
+% --- Executes on button press in media_b.
+function media_b_Callback(hObject, eventdata, handles)
+% hObject    handle to media_b (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+
+current_channel = handles.current_channel;
+stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+	Media_b  = [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0];
+    
+     Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    
+else
+	Media_b  = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+    Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+end
+
+handles.Media_b  = Media_b ;
+
+guidata(hObject, handles);
+
+% Hint: get(hObject,'Value') returns toggle state of media_b
+
+
+% --- Executes on button press in media_c.
+function media_c_Callback(hObject, eventdata, handles)
+% hObject    handle to media_c (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+
+current_channel = handles.current_channel;
+stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+	Media_c  = [0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0];
+    
+     Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    
+else
+	Media_c  = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+    Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+end
+
+handles.Media_c  = Media_c ;
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of media_c
+
+
+% --- Executes on button press in primary_outlet.
+function primary_outlet_Callback(hObject, eventdata, handles)
+% hObject    handle to primary_outlet (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+
+current_channel = handles.current_channel;
+stop_beads = handles.stop_beads;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+	Primary_outlet = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0];
+    
+     Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    
+else
+	Primary_outlet = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+    Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c+ stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+end
+
+handles.Primary_outlet = Primary_outlet;
+
+guidata(hObject, handles);
+% Hint: get(hObject,'Value') returns toggle state of primary_outlet
+
+
+% --- Executes on button press in stop_media.
+function stop_media_Callback(hObject, eventdata, handles)
+% hObject    handle to stop_media (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of stop_media
+error =0;% int error to zero, if an error occurs in the dll, an error is returned
+answer='empty_sring';% store the user answer in this variable
+
+Inst_ID = handles.inst_id;
+
+%%%%%%%%%%%%%%%%
+% MAIN PART
+%%%%%%%%%%%%%%%%
+%Present all the possibility of MUX
+%%%%%%%%%%%%%%%%
+%init required variables
+input_valve = -1;
+output_valve = -1;
+valve_state = -1;
+
+current_channel = handles.current_channel;
+stop_beads = handles.stop_beads;
+stop_media = handles.stop_media;
+current_channel = handles.current_channel;
+Filling_flow = handles.Filling_flow;
+Removing_flow = handles.Removing_Flow;
+Primary_outlet = handles.Primary_outlet; 
+Direct_to_array = handles.Direct_to_array;
+Media_a = handles.Media_a;
+Media_b = handles.Media_b;
+Media_c = handles.Media_c;
+stop_media = handles.stop_media;
+if (get(hObject,'Value') == get(hObject,'Max'))
+	stop_media = [0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0];
+   
+     Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c + stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+    
+else
+	stop_media = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0];
+    Array_user = current_channel + stop_beads + current_channel + Filling_flow + Removing_flow + Primary_outlet + Direct_to_array + Media_a + Media_b + Media_c + stop_media;
+    Array_user_Ptr = libpointer('int32Ptr',Array_user);%%init all valves here !!! should be exactly 16 elements, otherwise nothing will happen 
+
+            error = MUX_Set_all_valves(Inst_ID.Value, Array_user_Ptr,16);    
+end
+
+handles.stop_media = stop_media;
+
+guidata(hObject, handles);
